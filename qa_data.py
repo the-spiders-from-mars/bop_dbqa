@@ -4,12 +4,11 @@
 """
     Question and answer pair structure
 """
-import logging
 
 __author__ = "freemso"
 
 
-class QAItem(object):
+class Doc(object):
     def __init__(self, question):
         self.pos_answers = []
         self.question = question

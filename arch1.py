@@ -15,7 +15,7 @@ from keras.preprocessing import sequence
 #from pattern3.vector import l2_norm
 from scipy.sparse.linalg.isolve.tests.test_iterative import params
 
-import qa
+import qa_data
 import w2v
 import util.ProgressBar
 
@@ -48,53 +48,54 @@ class Arch1(object):
             self.model.load_weights(MODEL_WEIGHT_FILE)
         else:
             logging.info("Training model...")
-            # Preprocess train data
-            qa_items = preprocess(TRAIN_DATA_FILE)
-
             # Train the model
-            self._train(qa_items)
+            self._train(TRAIN_DATA_FILE)
 
-    def _train(self, qa_items):
+    def predict(self, file_path, out_file_path):
+        logging.info("Predicting...")
         questions = []
-        pos_answers = []
-        neg_answers = []
-        bar = util.ProgressBar.ProgressBar(total=len(qa_items))
-        for item in qa_items:
-            bar.log()
-            question = item.question
-
-            question_seg = jieba.cut(question)
-            question_word_idx = []
-            for word in question_seg:
-                if word in self.w2v.wv:
-                    question_word_idx.append(self.w2v.word2idx[word] + 1)
-                else:
-                    question_word_idx.append(0)
-
-            for pos_answer in item.pos_answers:
-                pos_answer_seg = jieba.cut(pos_answer)
-                pos_answer_word_idx = []
-                for word in pos_answer_seg:
+        answers = []
+        line_count = 0
+        with open(file_path, encoding="utf-8-sig") as in_file:
+            for line in in_file:
+                line_count += 1
+        bar = util.ProgressBar.ProgressBar(total=line_count)
+        with open(file_path, encoding="utf-8-sig") as in_file:
+            for line in in_file:
+                bar.log()
+                _, question, answer = line.strip().split("\t")
+                question_seg = jieba.cut(question)
+                question_word_idx = []
+                for word in question_seg:
                     if word in self.w2v.wv:
-                        pos_answer_word_idx.append(self.w2v.word2idx[word] + 1)
+                        question_word_idx.append(self.w2v.word2idx[word] + 1)
                     else:
-                        pos_answer_word_idx.append(0)
+                        question_word_idx.append(0)
+                questions.append(question_word_idx)
 
-                for neg_answer in item.neg_answers:
-                    neg_answer_seg = jieba.cut(neg_answer)
-                    neg_answer_word_idx = []
-                    for word in neg_answer_seg:
-                        if word in self.w2v.wv:
-                            neg_answer_word_idx.append(self.w2v.word2idx[word] + 1)
-                        else:
-                            neg_answer_word_idx.append(0)
-                    questions.append(question_word_idx)
-                    pos_answers.append(pos_answer_word_idx)
-                    neg_answers.append(neg_answer_word_idx)
+                answer_seg = jieba.cut(answer)
+                answer_word_idx = []
+                for word in answer_seg:
+                    if word in self.w2v.wv:
+                        answer_word_idx.append(self.w2v.word2idx[word] + 1)
+                    else:
+                        answer_word_idx.append(0)
+                answers.append(answer_word_idx)
 
-        questions = sequence.pad_sequences(questions, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0, dtype="float32")
-        pos_answers = sequence.pad_sequences(pos_answers, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0, dtype="float32")
-        neg_answers = sequence.pad_sequences(neg_answers, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0, dtype="float32")
+        questions = sequence.pad_sequences(questions, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0)
+        answers = sequence.pad_sequences(answers, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0)
+
+        # Predict
+        sims, _ = self.model.predict({"question_input": questions,
+                                      "answer_pos_input": answers,
+                                      "answer_neg_input": np.zeros(answers.shape)})
+        with open(out_file_path, "w") as out_file:
+            for sim in sims:
+                out_file.write(str(sim[0]) + "\n")
+
+    def _train(self, file_path):
+        # Preprocess the training data
+        questions, pos_answers, neg_answers = self._preprocess(file_path)
 
         # Train model
         self.model.fit({"question_input": questions,
@@ -173,10 +174,62 @@ class Arch1(object):
 
         # compile model
         model.compile(loss=max_margin_loss,
-                      optimizer="sgd",
-                      metrics=['accuracy'])
+                      optimizer="sgd")
 
         return model
+
+    def _preprocess(self, file_path):
+        q2doc = {}
+        with open(file_path, encoding="utf-8-sig") as in_file:
+            for line in in_file:
+                label, question, answer = line.strip().split("\t")
+                if question not in q2doc.keys():
+                    q2doc[question] = qa_data.Doc(question)
+                q2doc[question].add_ans(answer, bool(int(label)))
+
+        questions = []
+        pos_answers = []
+        neg_answers = []
+        bar = util.ProgressBar.ProgressBar(total=len(q2doc.values()))
+        for doc in q2doc.values():
+            bar.log()
+            question = doc.question
+
+            question_seg = jieba.cut(question)
+            question_word_idx = []
+            for word in question_seg:
+                if word in self.w2v.wv:
+                    question_word_idx.append(self.w2v.word2idx[word] + 1)
+                else:
+                    question_word_idx.append(0)
+
+            for pos_answer in doc.pos_answers:
+                pos_answer_seg = jieba.cut(pos_answer)
+                pos_answer_word_idx = []
+                for word in pos_answer_seg:
+                    if word in self.w2v.wv:
+                        pos_answer_word_idx.append(self.w2v.word2idx[word] + 1)
+                    else:
+                        pos_answer_word_idx.append(0)
+
+                for neg_answer in doc.neg_answers:
+                    neg_answer_seg = jieba.cut(neg_answer)
+                    neg_answer_word_idx = []
+                    for word in neg_answer_seg:
+                        if word in self.w2v.wv:
+                            neg_answer_word_idx.append(self.w2v.word2idx[word] + 1)
+                        else:
+                            neg_answer_word_idx.append(0)
+                    questions.append(question_word_idx)
+                    pos_answers.append(pos_answer_word_idx)
+                    neg_answers.append(neg_answer_word_idx)
+
+        questions = sequence.pad_sequences(questions, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0)
+        pos_answers = sequence.pad_sequences(pos_answers, maxlen=SENTENCE_LEN, padding="post", truncating="post",
+                                             value=0)
+        neg_answers = sequence.pad_sequences(neg_answers, maxlen=SENTENCE_LEN, padding="post", truncating="post",
+                                             value=0)
+        return questions, pos_answers, neg_answers
 
 
 def max_margin_loss(y_true, y_pred):
@@ -223,21 +276,11 @@ def cosine(x):
 #     return euclidean + sigmoid
 
 
-def preprocess(file_path):
-    q2qa = {}
-    with open(file_path, encoding="utf-8-sig") as in_file:
-        for line in in_file:
-            label, question, answer = line.strip().split("\t")
-            if question not in q2qa.keys():
-                q2qa[question] = qa.QAItem(question)
-            q2qa[question].add_ans(answer, bool(int(label)))
-    return q2qa.values()
-
-
 def main():
     logging.basicConfig(format='%(asctime)s: %(levelname)s: %(message)s')
     logging.root.setLevel(level=logging.INFO)
     arch1 = Arch1()
+    arch1.predict(DEV_DATA_FILE, "dev_out.txt")
 
 
 if __name__ == '__main__':
