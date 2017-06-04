@@ -54,10 +54,12 @@ class Arch1(object):
     def predict(self, file_path, out_file_path):
         import pickle
         # Preprocess the training data
-        qpn_tuple_path = pathlib.Path("temp/tuple_predict")
+        tuple_file = "temp/tuple_predict"
+        qpn_tuple_path = pathlib.Path(tuple_file)
         if qpn_tuple_path.is_file():
             logging.info("loading preprocessed the tuple from file")
-            questions, answers = pickle.load("temp/tuple_predict")
+            with open(tuple_file, "rb") as in_file:
+                questions, answers = pickle.load(in_file)
         else:
             logging.info("Predicting...")
             questions = []
@@ -91,27 +93,30 @@ class Arch1(object):
 
             questions = sequence.pad_sequences(questions, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0)
             answers = sequence.pad_sequences(answers, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0)
-
-            pickle.dump((questions, answers), "temp/tuple_predict")
+            with open(tuple_file, "w") as out_file:
+                pickle.dump((questions, answers), out_file)
 
         # Predict
         sims, _ = self.model.predict({"question_input": questions,
                                       "answer_pos_input": answers,
                                       "answer_neg_input": np.zeros(answers.shape)})
-        with open(out_file_path, "w") as out_file:
+        with open(out_file_path, "wb") as out_file:
             for sim in sims:
                 out_file.write(str(sim[0]) + "\n")
 
     def _train(self, file_path):
         import pickle
         # Preprocess the training data
-        qpn_tuple_path = pathlib.Path("temp/tuple")
+        tuple_file = "temp/tuple"
+        qpn_tuple_path = pathlib.Path(tuple_file)
         if qpn_tuple_path.is_file():
             logging.info("loading preprocessed the tuple from file")
-            questions, pos_answers, neg_answers = pickle.load("temp/tuple")
+            with open(tuple_file, "rb") as in_file:
+                questions, pos_answers, neg_answers = pickle.load(in_file)
         else:
             questions, pos_answers, neg_answers = self._preprocess(file_path)
-            pickle.dump((questions, pos_answers, neg_answers), "temp/tuple")
+            with open(tuple_file, "wb") as out_file:
+                pickle.dump((questions, pos_answers, neg_answers), out_file)
 
         # Train model
         self.model.fit({"question_input": questions,
