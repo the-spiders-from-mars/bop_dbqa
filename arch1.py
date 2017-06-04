@@ -12,7 +12,7 @@ import numpy as np
 from keras.engine import Input, Model
 from keras.layers import Embedding, Dense, Activation, Conv1D, MaxPooling1D, concatenate, Flatten, K, merge, dot
 from keras.preprocessing import sequence
-from pattern3.vector import l2_norm
+#from pattern3.vector import l2_norm
 from scipy.sparse.linalg.isolve.tests.test_iterative import params
 
 import qa
@@ -25,7 +25,7 @@ MODEL_WEIGHT_FILE = "model/arch1.model"
 TRAIN_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.train.txt"
 DEV_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.dev.txt"
 
-SENTENCE_LEN = 50
+SENTENCE_LEN = 30
 HIDDEN_LAYER_DIM = 200
 NUM_FILTERS = 1000  # number of filters for each filter size
 FILTER_SIZES = [2, 3, 4]  # kinds of filters
@@ -33,7 +33,7 @@ MARGIN = 0.009
 LEARNING_RATE = 0.01
 
 NUM_EPOCH = 10
-BATCH_SIZE = 10
+BATCH_SIZE = 64
 
 
 class Arch1(object):
@@ -92,16 +92,16 @@ class Arch1(object):
                     pos_answers.append(pos_answer_word_idx)
                     neg_answers.append(neg_answer_word_idx)
 
-        questions = sequence.pad_sequences(questions, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0)
-        pos_answers = sequence.pad_sequences(pos_answers, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0)
-        neg_answers = sequence.pad_sequences(neg_answers, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0)
+        questions = sequence.pad_sequences(questions, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0, dtype="float32")
+        pos_answers = sequence.pad_sequences(pos_answers, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0, dtype="float32")
+        neg_answers = sequence.pad_sequences(neg_answers, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0, dtype="float32")
 
         # Train model
         self.model.fit({"question_input": questions,
                         "answer_pos_input": pos_answers,
                         "answer_neg_input": neg_answers},
-                       {"pos_sim_output": np.ones(questions.shape),
-                        "neg_sim_output": -np.ones(questions.shape)},
+                       {"pos_sim_output": np.ones(questions.shape[0], dtype="float32"),
+                        "neg_sim_output": -np.ones(questions.shape[0], dtype="float32")},
                        epochs=NUM_EPOCH, batch_size=BATCH_SIZE)
 
         # save model weights
@@ -110,6 +110,11 @@ class Arch1(object):
     def _build(self):
         """ To setup the structure of the network """
         # embedding layer weight setting
+        import keras.backend.tensorflow_backend as K
+        import tensorflow as tf
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        K.set_session(tf.Session(config=config))
         embedding_weights = np.zeros((self.w2v.vocab_size + 1, self.w2v.vector_size))
         embedding_weights[0, :] = np.zeros((self.w2v.vector_size,))
         for index, word in self.w2v.idx2word.items():
@@ -179,43 +184,43 @@ def max_margin_loss(y_true, y_pred):
     pos = signed[0::2]
     neg = signed[1::2]
     # negative samples are multiplied by -1, so that the sign in the rankSVM objective is flipped below
-    return K.max(K.maximum(0, MARGIN - pos - neg))
+    return K.max(K.maximum(0., MARGIN - pos - neg))
 
 
 def cosine(x):
     return dot(x, -1, normalize=True)
 
 
-def polynomial(x):
-    return (params['gamma'] * dot(x[0], x[1]) + params['c']) ** params['d']
-
-
-def sigmoid(x):
-    return K.tanh(params['gamma'] * dot(x[0], x[1]) + params['c'])
-
-
-def rbf(x):
-    return K.exp(-1 * params['gamma'] * l2_norm(x[0] - x[1]) ** 2)
-
-
-def euclidean(x):
-    return 1 / (1 + l2_norm(x[0] - x[1]))
-
-
-def exponential(x):
-    return K.exp(-1 * params['gamma'] * l2_norm(x[0] - x[1]))
-
-
-def gesd(x):
-    euclidean = 1 / (1 + l2_norm(x[0] - x[1]))
-    sigmoid = 1 / (1 + K.exp(-1 * params['gamma'] * (dot(x[0], x[1]) + params['c'])))
-    return euclidean * sigmoid
-
-
-def aesd(x):
-    euclidean = 0.5 / (1 + l2_norm(x[0] - x[1]))
-    sigmoid = 0.5 / (1 + K.exp(-1 * params['gamma'] * (dot(x[0], x[1]) + params['c'])))
-    return euclidean + sigmoid
+# def polynomial(x):
+#     return (params['gamma'] * dot(x[0], x[1]) + params['c']) ** params['d']
+#
+#
+# def sigmoid(x):
+#     return K.tanh(params['gamma'] * dot(x[0], x[1]) + params['c'])
+#
+#
+# def rbf(x):vc
+#     return K.exp(-1 * params['gamma'] * l2_norm(x[0] - x[1]) ** 2)
+#
+#
+# def euclidean(x):
+#     return 1 / (1 + l2_norm(x[0] - x[1]))
+#
+#
+# def exponential(x):
+#     return K.exp(-1 * params['gamma'] * l2_norm(x[0] - x[1]))
+#
+#
+# def gesd(x):
+#     euclidean = 1 / (1 + l2_norm(x[0] - x[1]))
+#     sigmoid = 1 / (1 + K.exp(-1 * params['gamma'] * (dot(x[0], x[1]) + params['c'])))
+#     return euclidean * sigmoid
+#
+#
+# def aesd(x):
+#     euclidean = 0.5 / (1 + l2_norm(x[0] - x[1]))
+#     sigmoid = 0.5 / (1 + K.exp(-1 * params['gamma'] * (dot(x[0], x[1]) + params['c'])))
+#     return euclidean + sigmoid
 
 
 def preprocess(file_path):
