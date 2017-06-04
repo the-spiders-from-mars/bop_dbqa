@@ -11,7 +11,7 @@ import pathlib
 
 import gensim.models
 import jieba
-import opencc
+#import opencc
 import gensim.models.word2vec
 
 from util import preprocessing
@@ -50,22 +50,24 @@ class WordVector:
 
 
 def load_sougo_data():
-    logging.info("Loading sougo data...")
-    # count = 0
-    with open(RAW_DATA_PATH) as in_file, open(DATA_PATH, "w") as out_file:
-        cc = opencc.OpenCC(config="t2s.json")
-        for line in in_file:
-            # count += 1
-            # if count > 1000:
-            #     break
-            if line.strip().startswith("<content>"):
-                txt = line.strip("</content>")
-                if txt is not None:
-                    # convert to simplified chinese
-                    sentence = cc.convert(txt)
-                    sent_seg = jieba.cut(sentence)
-                    line = " ".join([word for word in sent_seg])
-                    out_file.write(line + "\n")
+    pass
+# def load_sougo_data():
+#     logging.info("Loading sougo data...")
+#     # count = 0
+#     with open(RAW_DATA_PATH) as in_file, open(DATA_PATH, "w") as out_file:
+#         cc = opencc.OpenCC(config="t2s.json")
+#         for line in in_file:
+#             # count += 1
+#             # if count > 1000:
+#             #     break
+#             if line.strip().startswith("<content>"):
+#                 txt = line.strip("</content>")
+#                 if txt is not None:
+#                     # convert to simplified chinese
+#                     sentence = cc.convert(txt)
+#                     sent_seg = jieba.cut(sentence)
+#                     line = " ".join([word for word in sent_seg])
+#                     out_file.write(line + "\n")
 
 
 def main():
