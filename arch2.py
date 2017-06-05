@@ -20,7 +20,7 @@ import util.ProgressBar
 
 __author__ = "freemso"
 
-VERSION = "2.10"
+VERSION = "2.12"
 
 TRAIN_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.train.txt"
 DEV_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.dev.txt"
@@ -209,8 +209,8 @@ class Arch2(object):
         embedding_layer = Embedding(self.w2v.vocab_size + 1, self.w2v.vector_size,
                                     weights=[embedding_weights], input_length=SENTENCE_LEN,
                                     trainable=True, name="emb")
-
-        hidden_layer = Dense(HIDDEN_LAYER_DIM, use_bias=True, name="hidden")
+        from keras import regularizers
+        hidden_layer = Dense(HIDDEN_LAYER_DIM, use_bias=True, name="hidden", kernel_regularizer=regularizers.l2(0.0001))
 
         q_in = Input(shape=(SENTENCE_LEN,), name="question_input")
         a_pos_in = Input(shape=(SENTENCE_LEN,), name="answer_pos_input")
@@ -247,8 +247,8 @@ class Arch2(object):
         a_pos = Activation(activation="tanh", name="answer_pos_tanh")(Flatten()(concatenate(concat_a_pos, axis=-1)))
         a_neg = Activation(activation="tanh", name="answer_neg_tanh")(Flatten()(concatenate(concat_a_neg, axis=-1)))
 
-        pos_sim = merge([q, a_pos], mode=dot_sim, output_shape=lambda x: x[:-1], name="pos_sim_output")
-        neg_sim = merge([q, a_neg], mode=dot_sim, output_shape=lambda x: x[:-1], name="neg_sim_output")
+        pos_sim = merge([q, a_pos], mode=gesd, output_shape=lambda x: x[:-1], name="pos_sim_output")
+        neg_sim = merge([q, a_neg], mode=gesd, output_shape=lambda x: x[:-1], name="neg_sim_output")
 
         model = Model(inputs=[q_in, a_pos_in, a_neg_in], outputs=[pos_sim, neg_sim])
 
@@ -313,11 +313,11 @@ class Arch2(object):
 
 
 def max_margin_loss(y_true, y_pred):
-    signed = K.flatten(y_pred * y_true)  # we do this, just so that y_true is part of the computational graph
+    signed = y_pred * y_true  # we do this, just so that y_true is part of the computational graph
     pos = signed[0::2]
     neg = signed[1::2]
     # negative samples are multiplied by -1, so that the sign in the rankSVM objective is flipped below
-    return K.max(K.maximum(0., MARGIN - pos - neg), axis=-1)
+    return K.max(K.maximum(0., MARGIN - pos - neg))
 
 
 def dot_sim(x):
@@ -345,8 +345,10 @@ def dot_sim(x):
 #
 #
 def gesd(x):
-    euclidean = 1 / (1 + K.sqrt(K.batch_dot(x[0] - x[1], x[0] - x[1], axes=-1)))
-    sigmoid = 1 / (1 + K.exp(-1 * GAMMA * (K.batch_dot(x[0], x[1], axes=-1) + C)))
+    x0 = K.l2_normalize(x[0], axis=-1)
+    x1 = K.l2_normalize(x[1], axis=-1)
+    euclidean = 1 / (1 + K.sqrt(K.batch_dot(x0 - x1, x0 - x1, axes=-1)))
+    sigmoid = 1 / (1 + K.exp(-1 * GAMMA * (K.batch_dot(x0, x1, axes=-1) + C)))
     return euclidean * sigmoid
 #
 #
@@ -361,7 +363,7 @@ def main():
     logging.root.setLevel(level=logging.INFO)
     arch2 = Arch2()
     arch2.predict(DEV_DATA_FILE, DEV_OUTPUT_FILE)
-    # arch2.test(TEST_DATA_FILE, TEST_OUTPUT_FILE)
+    arch2.test(TEST_DATA_FILE, TEST_OUTPUT_FILE)
 
 
 if __name__ == '__main__':
