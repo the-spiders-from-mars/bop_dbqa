@@ -20,7 +20,7 @@ import util.ProgressBar
 
 __author__ = "freemso"
 
-VERSION = "2.8"
+VERSION = "2.10"
 
 TRAIN_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.train.txt"
 DEV_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.dev.txt"
@@ -37,8 +37,8 @@ FILTER_SIZES = [2, 3, 4]  # kinds of filters
 MARGIN = 0.009
 LEARNING_RATE = 0.01
 
-NUM_EPOCH = 3
-BATCH_SIZE = 64
+NUM_EPOCH = 10
+BATCH_SIZE = 32
 
 GAMMA = 1.0
 C = 1
@@ -111,7 +111,7 @@ class Arch2(object):
                                       "answer_neg_input": np.zeros(answers.shape)})
         with open(out_file_path, "w") as out_file:
             for sim in sims:
-                out_file.write(str(sim[0]) + "\n")
+                out_file.write(str(sim) + "\n")
 
     def predict(self, file_path, out_file_path):
         import pickle
@@ -313,11 +313,11 @@ class Arch2(object):
 
 
 def max_margin_loss(y_true, y_pred):
-    signed = y_pred * y_true  # we do this, just so that y_true is part of the computational graph
-    pos = y_pred[0]
-    neg = y_pred[1]
+    signed = K.flatten(y_pred * y_true)  # we do this, just so that y_true is part of the computational graph
+    pos = signed[0::2]
+    neg = signed[1::2]
     # negative samples are multiplied by -1, so that the sign in the rankSVM objective is flipped below
-    return K.maximum(0., MARGIN - pos + neg)
+    return K.max(K.maximum(0., MARGIN - pos - neg), axis=-1)
 
 
 def dot_sim(x):
