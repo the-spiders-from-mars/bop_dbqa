@@ -10,10 +10,9 @@ import pathlib
 import jieba
 import numpy as np
 from keras.engine import Input, Model
-from keras.layers import Embedding, Dense, Activation, Conv1D, MaxPooling1D, concatenate, Flatten, K, merge, dot
+from keras.layers import Embedding, Dense, Activation, Conv1D, MaxPooling1D, concatenate, Flatten, merge
 from keras.preprocessing import sequence
-#from pattern3.vector import l2_norm
-from scipy.sparse.linalg.isolve.tests.test_iterative import params
+from keras import backend as K
 
 import qa_data
 import w2v
@@ -21,7 +20,11 @@ import util.ProgressBar
 
 __author__ = "freemso"
 
+<<<<<<< HEAD:arch2.1.py
 MODEL_WEIGHT_FILE = "model/arch2-3.model"
+=======
+MODEL_WEIGHT_FILE = "model/arch2-2.model"
+>>>>>>> 52a8cc87bc66127b7f0a819a9919c001f848cc8f:arch2.py
 TRAIN_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.train.txt"
 DEV_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.dev.txt"
 
@@ -34,6 +37,9 @@ LEARNING_RATE = 0.01
 
 NUM_EPOCH = 10
 BATCH_SIZE = 16
+
+GAMMA = 1.0
+C = 1
 
 
 class Arch2(object):
@@ -185,8 +191,8 @@ class Arch2(object):
         a_pos = Activation(activation="tanh", name="answer_pos_tanh")(Flatten()(concatenate(concat_a_pos, axis=-1)))
         a_neg = Activation(activation="tanh", name="answer_neg_tanh")(Flatten()(concatenate(concat_a_neg, axis=-1)))
 
-        pos_sim = merge([q, a_pos], mode=cosine, output_shape=lambda x: x[:-1], name="pos_sim_output")
-        neg_sim = merge([q, a_neg], mode=cosine, output_shape=lambda x: x[:-1], name="neg_sim_output")
+        pos_sim = merge([q, a_pos], mode=gesd, output_shape=lambda x: x[:-1], name="pos_sim_output")
+        neg_sim = merge([q, a_neg], mode=gesd, output_shape=lambda x: x[:-1], name="neg_sim_output")
 
         model = Model(inputs=[q_in, a_pos_in, a_neg_in], outputs=[pos_sim, neg_sim])
 
@@ -252,14 +258,10 @@ class Arch2(object):
 
 def max_margin_loss(y_true, y_pred):
     signed = y_pred * y_true  # we do this, just so that y_true is part of the computational graph
-    pos = signed[0::2]
-    neg = signed[1::2]
+    pos = signed[0]
+    neg = signed[1]
     # negative samples are multiplied by -1, so that the sign in the rankSVM objective is flipped below
-    return K.max(K.maximum(0., MARGIN - pos - neg))
-
-
-def cosine(x):
-    return dot(x, -1, normalize=True)
+    return K.maximum(0., MARGIN - pos - neg)
 
 
 # def polynomial(x):
@@ -282,10 +284,10 @@ def cosine(x):
 #     return K.exp(-1 * params['gamma'] * l2_norm(x[0] - x[1]))
 #
 #
-# def gesd(x):
-#     euclidean = 1 / (1 + l2_norm(x[0] - x[1]))
-#     sigmoid = 1 / (1 + K.exp(-1 * params['gamma'] * (dot(x[0], x[1]) + params['c'])))
-#     return euclidean * sigmoid
+def gesd(x):
+    euclidean = 1 / (1 + K.sqrt(K.batch_dot(x[0] - x[1], x[0] - x[1], axes=-1)))
+    sigmoid = 1 / (1 + K.exp(-1 * GAMMA * (K.batch_dot(x[0], x[1], axes=-1) + C)))
+    return euclidean * sigmoid
 #
 #
 # def aesd(x):
@@ -298,7 +300,11 @@ def main():
     logging.basicConfig(format='%(asctime)s: %(levelname)s: %(message)s')
     logging.root.setLevel(level=logging.INFO)
     arch2 = Arch2()
+<<<<<<< HEAD:arch2.1.py
     arch2.predict(DEV_DATA_FILE, "dev_out_2_3.txt")
+=======
+    arch2.predict(DEV_DATA_FILE, "dev_out_2_2.txt")
+>>>>>>> 52a8cc87bc66127b7f0a819a9919c001f848cc8f:arch2.py
 
 
 if __name__ == '__main__':
