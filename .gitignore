@@ -7,3 +7,4 @@ util/__pycache__/
 model/
 __pycache__/
 temp/
+/out/

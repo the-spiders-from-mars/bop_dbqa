@@ -20,13 +20,15 @@ import util.ProgressBar
 
 __author__ = "freemso"
 
-<<<<<<< HEAD:arch2.1.py
-MODEL_WEIGHT_FILE = "model/arch2-3.model"
-=======
-MODEL_WEIGHT_FILE = "model/arch2-2.model"
->>>>>>> 52a8cc87bc66127b7f0a819a9919c001f848cc8f:arch2.py
+VERSION = "2.3"
+
 TRAIN_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.train.txt"
 DEV_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.dev.txt"
+TEST_DATA_FILE = "data/BoP2017-DBQA.test.txt"
+
+MODEL_WEIGHT_FILE = "model/arch_"+VERSION+".model"
+DEV_OUTPUT_FILE = "out/dev_"+VERSION+".txt"
+TEST_OUTPUT_FILE = "out/test_"+VERSION+".txt"
 
 SENTENCE_LEN = 30
 HIDDEN_LAYER_DIM = 200
@@ -57,13 +59,67 @@ class Arch2(object):
             # Train the model
             self._train(TRAIN_DATA_FILE)
 
+    def test(self, file_path, out_file_path):
+        import pickle
+        # Preprocess the training data
+        tuple_file = "temp/tuple_test"
+        qpn_tuple_path = pathlib.Path(tuple_file)
+        if qpn_tuple_path.is_file():
+            logging.info("Loading preprocessed test data from file")
+            with open(tuple_file, "rb") as in_file:
+                questions, answers = pickle.load(in_file)
+        else:
+            logging.info("Test...")
+            questions = []
+            answers = []
+            line_count = 0
+            with open(file_path, encoding="utf-8-sig") as in_file:
+                for _ in in_file:
+                    line_count += 1
+            bar = util.ProgressBar.ProgressBar(total=line_count)
+            with open(file_path, encoding="utf-8-sig") as in_file:
+                for line in in_file:
+                    bar.log()
+                    question, answer = line.strip().split("\t")
+                    question_seg = jieba.cut(question)
+                    question_word_idx = []
+                    for word in question_seg:
+                        if word in self.w2v.wv:
+                            question_word_idx.append(self.w2v.word2idx[word] + 1)
+                        else:
+                            question_word_idx.append(0)
+                    questions.append(question_word_idx)
+
+                    answer_seg = jieba.cut(answer)
+                    answer_word_idx = []
+                    for word in answer_seg:
+                        if word in self.w2v.wv:
+                            answer_word_idx.append(self.w2v.word2idx[word] + 1)
+                        else:
+                            answer_word_idx.append(0)
+                    answers.append(answer_word_idx)
+
+            questions = sequence.pad_sequences(questions, maxlen=SENTENCE_LEN, padding="post", truncating="post",
+                                               value=0)
+            answers = sequence.pad_sequences(answers, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0)
+            with open(tuple_file, "wb") as out_file:
+                pickle.dump((questions, answers), out_file)
+
+        # Predict
+        sims, _ = self.model.predict({"question_input": questions,
+                                      "answer_pos_input": answers,
+                                      "answer_neg_input": np.zeros(answers.shape)})
+        with open(out_file_path, "w") as out_file:
+            for sim in sims:
+                out_file.write(str(sim[0]) + "\n")
+
     def predict(self, file_path, out_file_path):
         import pickle
         # Preprocess the training data
         tuple_file = "temp/tuple_predict"
         qpn_tuple_path = pathlib.Path(tuple_file)
         if qpn_tuple_path.is_file():
-            logging.info("loading preprocessed the tuple from file")
+            logging.info("Loading preprocessed development data from file")
             with open(tuple_file, "rb") as in_file:
                 questions, answers = pickle.load(in_file)
         else:
@@ -72,7 +128,7 @@ class Arch2(object):
             answers = []
             line_count = 0
             with open(file_path, encoding="utf-8-sig") as in_file:
-                for line in in_file:
+                for _ in in_file:
                     line_count += 1
             bar = util.ProgressBar.ProgressBar(total=line_count)
             with open(file_path, encoding="utf-8-sig") as in_file:
@@ -116,7 +172,7 @@ class Arch2(object):
         tuple_file = "temp/tuple"
         qpn_tuple_path = pathlib.Path(tuple_file)
         if qpn_tuple_path.is_file():
-            logging.info("loading preprocessed the tuple from file")
+            logging.info("Loading preprocessed training data from file")
             with open(tuple_file, "rb") as in_file:
                 questions, pos_answers, neg_answers = pickle.load(in_file)
         else:
@@ -300,11 +356,8 @@ def main():
     logging.basicConfig(format='%(asctime)s: %(levelname)s: %(message)s')
     logging.root.setLevel(level=logging.INFO)
     arch2 = Arch2()
-<<<<<<< HEAD:arch2.1.py
-    arch2.predict(DEV_DATA_FILE, "dev_out_2_3.txt")
-=======
-    arch2.predict(DEV_DATA_FILE, "dev_out_2_2.txt")
->>>>>>> 52a8cc87bc66127b7f0a819a9919c001f848cc8f:arch2.py
+    arch2.predict(DEV_DATA_FILE, DEV_OUTPUT_FILE)
+    arch2.test(TEST_DATA_FILE, TEST_OUTPUT_FILE)
 
 
 if __name__ == '__main__':
