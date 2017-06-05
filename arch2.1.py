@@ -21,7 +21,7 @@ import util.ProgressBar
 
 __author__ = "freemso"
 
-MODEL_WEIGHT_FILE = "model/arch2-1.model"
+MODEL_WEIGHT_FILE = "model/arch2-3.model"
 TRAIN_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.train.txt"
 DEV_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.dev.txt"
 
@@ -298,7 +298,7 @@ def main():
     logging.basicConfig(format='%(asctime)s: %(levelname)s: %(message)s')
     logging.root.setLevel(level=logging.INFO)
     arch2 = Arch2()
-    arch2.predict(DEV_DATA_FILE, "dev_out_2_1.txt")
+    arch2.predict(DEV_DATA_FILE, "dev_out_2_3.txt")
 
 
 if __name__ == '__main__':

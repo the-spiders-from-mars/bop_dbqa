@@ -93,14 +93,14 @@ class Arch1(object):
 
             questions = sequence.pad_sequences(questions, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0)
             answers = sequence.pad_sequences(answers, maxlen=SENTENCE_LEN, padding="post", truncating="post", value=0)
-            with open(tuple_file, "w") as out_file:
+            with open(tuple_file, "wb") as out_file:
                 pickle.dump((questions, answers), out_file)
 
         # Predict
         sims, _ = self.model.predict({"question_input": questions,
                                       "answer_pos_input": answers,
                                       "answer_neg_input": np.zeros(answers.shape)})
-        with open(out_file_path, "wb") as out_file:
+        with open(out_file_path, "w") as out_file:
             for sim in sims:
                 out_file.write(str(sim[0]) + "\n")
 
@@ -301,7 +301,7 @@ def main():
     logging.basicConfig(format='%(asctime)s: %(levelname)s: %(message)s')
     logging.root.setLevel(level=logging.INFO)
     arch1 = Arch1()
-    arch1.predict(DEV_DATA_FILE, "dev_out3.txt")
+    arch1.predict(DEV_DATA_FILE, "dev_out4.txt")
 
 
 if __name__ == '__main__':
