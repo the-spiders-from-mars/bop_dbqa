@@ -10,7 +10,7 @@ import pathlib
 import jieba
 import numpy as np
 from keras.engine import Input, Model
-from keras.layers import Embedding, Dense, Activation, Conv1D, MaxPooling1D, concatenate, Flatten, merge
+from keras.layers import Embedding, Dense, Activation, Conv1D, MaxPooling1D, concatenate, Flatten, merge, dot
 from keras.preprocessing import sequence
 from keras import backend as K
 
@@ -20,7 +20,7 @@ import util.ProgressBar
 
 __author__ = "freemso"
 
-VERSION = "2.3"
+VERSION = "2.8"
 
 TRAIN_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.train.txt"
 DEV_DATA_FILE = "data/BoP2017_DBAQ_dev_train_data/BoP2017-DBQA.dev.txt"
@@ -37,8 +37,8 @@ FILTER_SIZES = [2, 3, 4]  # kinds of filters
 MARGIN = 0.009
 LEARNING_RATE = 0.01
 
-NUM_EPOCH = 10
-BATCH_SIZE = 16
+NUM_EPOCH = 3
+BATCH_SIZE = 64
 
 GAMMA = 1.0
 C = 1
@@ -247,8 +247,8 @@ class Arch2(object):
         a_pos = Activation(activation="tanh", name="answer_pos_tanh")(Flatten()(concatenate(concat_a_pos, axis=-1)))
         a_neg = Activation(activation="tanh", name="answer_neg_tanh")(Flatten()(concatenate(concat_a_neg, axis=-1)))
 
-        pos_sim = merge([q, a_pos], mode=gesd, output_shape=lambda x: x[:-1], name="pos_sim_output")
-        neg_sim = merge([q, a_neg], mode=gesd, output_shape=lambda x: x[:-1], name="neg_sim_output")
+        pos_sim = merge([q, a_pos], mode=dot_sim, output_shape=lambda x: x[:-1], name="pos_sim_output")
+        neg_sim = merge([q, a_neg], mode=dot_sim, output_shape=lambda x: x[:-1], name="neg_sim_output")
 
         model = Model(inputs=[q_in, a_pos_in, a_neg_in], outputs=[pos_sim, neg_sim])
 
@@ -314,10 +314,14 @@ class Arch2(object):
 
 def max_margin_loss(y_true, y_pred):
     signed = y_pred * y_true  # we do this, just so that y_true is part of the computational graph
-    pos = signed[0]
-    neg = signed[1]
+    pos = y_pred[0]
+    neg = y_pred[1]
     # negative samples are multiplied by -1, so that the sign in the rankSVM objective is flipped below
-    return K.maximum(0., MARGIN - pos - neg)
+    return K.maximum(0., MARGIN - pos + neg)
+
+
+def dot_sim(x):
+    return dot(x, axes=-1, normalize=True)
 
 
 # def polynomial(x):
@@ -357,7 +361,7 @@ def main():
     logging.root.setLevel(level=logging.INFO)
     arch2 = Arch2()
     arch2.predict(DEV_DATA_FILE, DEV_OUTPUT_FILE)
-    arch2.test(TEST_DATA_FILE, TEST_OUTPUT_FILE)
+    # arch2.test(TEST_DATA_FILE, TEST_OUTPUT_FILE)
 
 
 if __name__ == '__main__':

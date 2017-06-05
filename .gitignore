@@ -4,3 +4,4 @@ model/
 util/__pycache__/
 __pycache__/
 temp/
+out/
