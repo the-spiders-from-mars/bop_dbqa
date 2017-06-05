@@ -4,7 +4,5 @@ model/word2vec.model.syn1neg.npy
 model/word2vec.model.wv.syn0.npy
 model/word2vec_sample.model
 util/__pycache__/
-model/
 __pycache__/
 temp/
-/out/
