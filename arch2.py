@@ -247,8 +247,8 @@ class Arch2(object):
         a_pos = Activation(activation="tanh", name="answer_pos_tanh")(Flatten()(concatenate(concat_a_pos, axis=-1)))
         a_neg = Activation(activation="tanh", name="answer_neg_tanh")(Flatten()(concatenate(concat_a_neg, axis=-1)))
 
-        pos_sim = merge([q, a_pos], mode=gesd, output_shape=lambda x: x[:-1], name="pos_sim_output")
-        neg_sim = merge([q, a_neg], mode=gesd, output_shape=lambda x: x[:-1], name="neg_sim_output")
+        pos_sim = merge([q, a_pos], mode=dot_sim, output_shape=lambda x: x[:-1], name="pos_sim_output")
+        neg_sim = merge([q, a_neg], mode=dot_sim, output_shape=lambda x: x[:-1], name="neg_sim_output")
 
         model = Model(inputs=[q_in, a_pos_in, a_neg_in], outputs=[pos_sim, neg_sim])
 
